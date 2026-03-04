@@ -1,5 +1,5 @@
-use nalgebra::{Matrix, Matrix4, Const, Vector3};
-use nalgebra::UnitQuaternion;
+use defmt::*;
+use nalgebra::{Matrix, Matrix4, Const, Vector3, UnitQuaternion};
 
 // Define custom types for fixed-size matrices and vectors
 
@@ -25,7 +25,7 @@ impl EKF {
     pub fn new(accel_data: Option<[f64; 3]>) -> Self {
         let (q0, q1, q2, q3) = if let Some(accel_data) = accel_data {
             // Normalize accelerometer vector
-            let norm = (accel_data[0].powi(2) + accel_data[1].powi(2) + accel_data[2].powi(2)).sqrt();
+            let norm = Vector3::new(accel_data[0], accel_data[1], accel_data[2]).norm();
             let ax = accel_data[0] / norm;
             let ay = accel_data[1] / norm;
             let az = -accel_data[2] / norm;
@@ -36,7 +36,7 @@ impl EKF {
             let q2 = ax / (2.0 * q0);
             let q3: f64 = 0.0; // Yaw is zero since accelerometer data cannot calulcate yaw angles
 
-            let norm = (q0.powi(2) + q1.powi(2) + q2.powi(2) + q3.powi(2)).sqrt();
+            let norm = Vector4::new(q0, q1, q2, q3).norm();
             let q0 = q0 / norm;
             let q1 = q1 / norm;
             let q2 = q2 / norm;
@@ -144,7 +144,7 @@ impl EKF {
             // 9. Re-lock yaw axis if necessary
             self.lock_yaw(); // ✅ centralized yaw suppression
         } else {
-            eprintln!("Warning: Skipping EKF update — non-invertible innovation covariance.");
+            error!("Warning: Skipping EKF update — non-invertible innovation covariance.");
         }
     }
 

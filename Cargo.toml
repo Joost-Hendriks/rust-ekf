@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nalgebra = "0.33.2"
+nalgebra = { version = "0.33.2", default-features = false, features = ["libm"] }
+defmt = "0.3"
 
 [dev-dependencies]
 approx = "0.5"
