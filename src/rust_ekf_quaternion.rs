@@ -94,14 +94,14 @@ impl EKF {
         let q = Vector4::new(self.state[0], self.state[1], self.state[2], self.state[3]);
         let omega_matrix = Self::omega_matrix(omega);
         let q_dot = 0.5 * omega_matrix * q;
-        let q_new = q + q_dot * dt;
+        let q_new = q + q_dot * dt as f64;
 
         // 3. Update state with new quaternion
         self.state.fixed_rows_mut::<4>(0).copy_from(&q_new);
         Self::normalize_quaternion_in_state(&mut self.state);
 
         // 4. Compute Jacobian of motion model (F = ∂f/∂x)
-        let f_jacobian = self.compute_f_jacobian(gyro, dt);
+        let f_jacobian = self.compute_f_jacobian(gyro, dt as f64);
         
         // 5. Propagate uncertainty using the covariance update: P' = FPFᵀ + Q
         self.covariance = f_jacobian * self.covariance * f_jacobian.transpose() + self.process_noise;
@@ -213,21 +213,25 @@ impl EKF {
         let q2 = q[2];
         let q3 = q[3];
 
+        // h(x) = R^T * [0, 0, -g], so H = ∂h/∂q:
+        //   accel_x = -2g(q1q3 - q0q2) = 2g(q0q2 - q1q3)
+        //   accel_y = -2g(q2q3 + q0q1)
+        //   accel_z = -g(1 - 2q1² - 2q2²)
         let mut h = Matrix3x7::zeros();
-        h[(0, 0)] = 2.0 * (-GRAVITY * q2);
-        h[(0, 1)] = 2.0 * (GRAVITY * q3);
-        h[(0, 2)] = 2.0 * (-GRAVITY * q0);
-        h[(0, 3)] = 2.0 * (GRAVITY * q1);
+        h[(0, 0)] = 2.0 * GRAVITY * q2;
+        h[(0, 1)] = -2.0 * GRAVITY * q3;
+        h[(0, 2)] = 2.0 * GRAVITY * q0;
+        h[(0, 3)] = -2.0 * GRAVITY * q1;
 
-        h[(1, 0)] = 2.0 * (GRAVITY * q1);
-        h[(1, 1)] = 2.0 * (GRAVITY * q0);
-        h[(1, 2)] = 2.0 * (GRAVITY * q3);
-        h[(1, 3)] = 2.0 * (GRAVITY * q2);
+        h[(1, 0)] = -2.0 * GRAVITY * q1;
+        h[(1, 1)] = -2.0 * GRAVITY * q0;
+        h[(1, 2)] = -2.0 * GRAVITY * q3;
+        h[(1, 3)] = -2.0 * GRAVITY * q2;
 
-        h[(2, 0)] = 2.0 * (GRAVITY * q0);
-        h[(2, 1)] = 2.0 * (-GRAVITY * q1);
-        h[(2, 2)] = 2.0 * (-GRAVITY * q2);
-        h[(2, 3)] = 2.0 * (-GRAVITY * q3);
+        h[(2, 0)] = 0.0;
+        h[(2, 1)] = 4.0 * GRAVITY * q1;
+        h[(2, 2)] = 4.0 * GRAVITY * q2;
+        h[(2, 3)] = 0.0;
 
         h
     }
@@ -276,14 +280,13 @@ impl EKF {
     }
 
     fn remove_yaw_from_quaternion(&mut self) {
-        let q = UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(
-            self.state[0], self.state[1], self.state[2], self.state[3],
-        ));
-    
-        let euler = q.euler_angles();
-        let new_q = UnitQuaternion::from_euler_angles(euler.0, euler.1, 0.0);
-        let qn = new_q.quaternion();
-    
+        // Strip yaw directly in quaternion space by zeroing q3 (the yaw-carrying
+        // component) and renormalizing. Avoids Euler angle gimbal lock at ±90° pitch.
+        let q = nalgebra::Quaternion::new(
+            self.state[0], self.state[1], self.state[2], 0.0,
+        );
+        let qn = UnitQuaternion::from_quaternion(q);
+
         self.state[0] = qn.w;
         self.state[1] = qn.i;
         self.state[2] = qn.j;
@@ -292,7 +295,10 @@ impl EKF {
 
     fn lock_yaw(&mut self) {
         self.state[6] = 0.0;
-        self.covariance[(6, 6)] = 0.0;
+        for i in 0..7 {
+            self.covariance[(6, i)] = 0.0;
+            self.covariance[(i, 6)] = 0.0;
+        }
         self.remove_yaw_from_quaternion();
     }
     
