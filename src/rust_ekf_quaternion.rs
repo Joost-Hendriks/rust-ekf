@@ -6,13 +6,13 @@ use nalgebra::{Matrix, Matrix4, Const, Vector3, UnitQuaternion, ComplexField};
 
 // nalgebra doesn't support all the sizes of vectors and matrices that we need out of the box
 // but we can create custom sizes like this
-type Vector7 = Matrix<f64, Const<7>, Const<1>, nalgebra::ArrayStorage<f64, 7, 1>>;
-type Matrix7 = Matrix<f64, Const<7>, Const<7>, nalgebra::ArrayStorage<f64, 7, 7>>;
-type Matrix3 = Matrix<f64, Const<3>, Const<3>, nalgebra::ArrayStorage<f64, 3, 3>>;
-type Matrix3x7 = Matrix<f64, Const<3>, Const<7>, nalgebra::ArrayStorage<f64, 3, 7>>;
-type Vector4 = Matrix<f64, Const<4>, Const<1>, nalgebra::ArrayStorage<f64, 4, 1>>;
+type Vector7 = Matrix<f32, Const<7>, Const<1>, nalgebra::ArrayStorage<f32, 7, 1>>;
+type Matrix7 = Matrix<f32, Const<7>, Const<7>, nalgebra::ArrayStorage<f32, 7, 7>>;
+type Matrix3 = Matrix<f32, Const<3>, Const<3>, nalgebra::ArrayStorage<f32, 3, 3>>;
+type Matrix3x7 = Matrix<f32, Const<3>, Const<7>, nalgebra::ArrayStorage<f32, 3, 7>>;
+type Vector4 = Matrix<f32, Const<4>, Const<1>, nalgebra::ArrayStorage<f32, 4, 1>>;
 
-pub const GRAVITY: f64 = 9.81; // Gravitational constant (m/s^2)
+pub const GRAVITY: f32 = 9.81; // Gravitational constant (m/s^2)
 
 pub struct EKF {
     pub state: Vector7,                 // State vector: [q0, q1, q2, q3, bx, by, bz]
@@ -23,33 +23,33 @@ pub struct EKF {
 
 impl EKF {
     /// Create a new EKF instance, passing accelerometer data to calculate the initial quaternion (avoids using 0's for initial orientation)
-    pub fn new(accel_data: Option<[f64; 3]>) -> Self {
+    pub fn new(accel_data: Option<[f32; 3]>) -> Self {
         let (q0, q1, q2, q3) = if let Some(accel_data) = accel_data {
             // Normalize accelerometer vector
             let norm = Vector3::new(accel_data[0], accel_data[1], accel_data[2]).norm();
             let ax = accel_data[0] / norm;
             let ay = accel_data[1] / norm;
             let az = -accel_data[2] / norm;
-    
+
             // Calculate quaternion from accelerometer data
             let q0 = (1.0 + az).sqrt() / 2.0;
             let q1 = -ay / (2.0 * q0);
             let q2 = ax / (2.0 * q0);
-            let q3: f64 = 0.0; // Yaw is zero since accelerometer data cannot calulcate yaw angles
+            let q3: f32 = 0.0; // Yaw is zero since accelerometer data cannot calulcate yaw angles
 
             let norm = Vector4::new(q0, q1, q2, q3).norm();
             let q0 = q0 / norm;
             let q1 = q1 / norm;
             let q2 = q2 / norm;
             let q3 = q3 / norm;
-            
+
 
             (q0, q1, q2, q3)
         } else {
             // Default to identity quaternion
             (1.0, 0.0, 0.0, 0.0)
         };
-    
+
         // Initialize process and measurement noise matrices
         let mut process_noise = Matrix7::zeros();
         process_noise[(0, 0)] = 0.05; // q0
@@ -59,13 +59,13 @@ impl EKF {
         process_noise[(4, 4)] = 0.01; // bx
         process_noise[(5, 5)] = 0.01; // by
         process_noise[(6, 6)] = 0.01; // bz
-        
+
         let mut measurement_noise = Matrix3::zeros();
         measurement_noise[(0, 0)] = 0.02; // accel x
         measurement_noise[(1, 1)] = 0.02; // accel y
-        measurement_noise[(2, 2)] = 0.02; // accel z 
+        measurement_noise[(2, 2)] = 0.02; // accel z
 
-    
+
         EKF {
             state: {
                 let mut state = Vector7::zeros();
@@ -83,9 +83,9 @@ impl EKF {
             measurement_noise,
         }
     }
-    
+
     /// EKF Predict Step: Propagates state and covariance forward using gyro data.
-    pub fn predict(&mut self, gyro: [f64; 3], dt: f64) {
+    pub fn predict(&mut self, gyro: [f32; 3], dt: f32) {
         // 1. Subtract estimated bias from raw gyro measurements (control input)
         let bias = self.state.fixed_rows::<3>(4).clone_owned(); // [bx, by, bz]
         let omega = Vector3::new(gyro[0], gyro[1], gyro[2]) - bias;
@@ -94,15 +94,15 @@ impl EKF {
         let q = Vector4::new(self.state[0], self.state[1], self.state[2], self.state[3]);
         let omega_matrix = Self::omega_matrix(omega);
         let q_dot = 0.5 * omega_matrix * q;
-        let q_new = q + q_dot * dt as f64;
+        let q_new = q + q_dot * dt;
 
         // 3. Update state with new quaternion
         self.state.fixed_rows_mut::<4>(0).copy_from(&q_new);
         Self::normalize_quaternion_in_state(&mut self.state);
 
         // 4. Compute Jacobian of motion model (F = ∂f/∂x)
-        let f_jacobian = self.compute_f_jacobian(gyro, dt as f64);
-        
+        let f_jacobian = self.compute_f_jacobian(gyro, dt);
+
         // 5. Propagate uncertainty using the covariance update: P' = FPFᵀ + Q
         self.covariance = f_jacobian * self.covariance * f_jacobian.transpose() + self.process_noise;
 
@@ -112,7 +112,7 @@ impl EKF {
 
 
     /// EKF Update Step: Corrects the prediction using accelerometer data (gravity vector).
-    pub fn update(&mut self, accel: [f64; 3]) {
+    pub fn update(&mut self, accel: [f32; 3]) {
         // 1. Compute expected gravity vector in sensor frame (using estimated orientation)
         let gravity = Vector3::new(0.0, 0.0, -GRAVITY);
         let q = Vector4::new(self.state[0], self.state[1], self.state[2], self.state[3]);
@@ -149,12 +149,11 @@ impl EKF {
         }
     }
 
-    
 
 
 
     /// Compute the dynamic Jacobian (∂f/∂x)
-    fn compute_f_jacobian(&self, gyro: [f64; 3], dt: f64) -> Matrix7 {
+    fn compute_f_jacobian(&self, gyro: [f32; 3], dt: f32) -> Matrix7 {
         let q0 = self.state[0];
         let q1 = self.state[1];
         let q2 = self.state[2];
@@ -244,7 +243,7 @@ impl EKF {
             state.fixed_rows_mut::<4>(0).copy_from(&q_normalized);
         }
     }
-    
+
 
 
     /// Convert quaternion to rotation matrix
@@ -270,7 +269,7 @@ impl EKF {
     }
 
     /// Compute omega matrix for quaternion dynamics
-    fn omega_matrix(omega: Vector3<f64>) -> Matrix<f64, Const<4>, Const<4>, nalgebra::ArrayStorage<f64, 4, 4>> {
+    fn omega_matrix(omega: Vector3<f32>) -> Matrix<f32, Const<4>, Const<4>, nalgebra::ArrayStorage<f32, 4, 4>> {
         Matrix4::new(
             0.0, -omega[0], -omega[1], -omega[2],
             omega[0], 0.0, omega[2], -omega[1],
@@ -301,8 +300,6 @@ impl EKF {
         }
         self.remove_yaw_from_quaternion();
     }
-    
-
 
 
     /// Get the fully updated state vector
