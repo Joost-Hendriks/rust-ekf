@@ -10,7 +10,7 @@ mod tests {
     #[test]
     fn test_initialization() {
         // Test that the EKF initializes correctly with no accelerometer input (defaults to identity quaternion)
-        let ekf = EKF::new(None);
+        let ekf = EKF::new(None, None);
         // The state vector should have 7 elements
         assert_eq!(ekf.state.len(), 7);
         // The quaternion should be initialized as identity: [1, 0, 0, 0]
@@ -31,7 +31,7 @@ mod tests {
     #[test]
     fn test_predict() {
         // Test the predict step with sample gyro data and a fixed time step
-        let mut ekf = EKF::new(None);
+        let mut ekf = EKF::new(None, None);
         let dt = 0.01;
         let gyro_data = [0.1, 0.2, 0.3]; // in rad/s
         let initial_state = ekf.get_state();
@@ -53,7 +53,7 @@ mod tests {
     #[test]
     fn test_update() {
         // Test that the update step correctly corrects the state using accelerometer data.
-        let mut ekf = EKF::new(None);
+        let mut ekf = EKF::new(None, None);
         let dt = 0.01;
         let gyro_data = [0.1, 0.2, 0.3];
         // Run a predict to have a non-identity quaternion
