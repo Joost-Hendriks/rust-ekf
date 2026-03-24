@@ -41,18 +41,18 @@ impl EKF {
         };
 
         let mut process_noise = Matrix7::zeros();
-        process_noise[(0, 0)] = 0.05;
-        process_noise[(1, 1)] = 0.05;
-        process_noise[(2, 2)] = 0.05;
-        process_noise[(3, 3)] = 0.05;
-        process_noise[(4, 4)] = 0.001;
-        process_noise[(5, 5)] = 0.001;
-        process_noise[(6, 6)] = 0.001;
+        process_noise[(0, 0)] = 0.0005;
+        process_noise[(1, 1)] = 0.0005;
+        process_noise[(2, 2)] = 0.0005;
+        process_noise[(3, 3)] = 0.0005;
+        process_noise[(4, 4)] = 0.0;
+        process_noise[(5, 5)] = 0.0;
+        process_noise[(6, 6)] = 0.0;
 
         let mut measurement_noise = Matrix3::zeros();
-        measurement_noise[(0, 0)] = 0.02;
-        measurement_noise[(1, 1)] = 0.02;
-        measurement_noise[(2, 2)] = 0.02;
+        measurement_noise[(0, 0)] = 0.5;
+        measurement_noise[(1, 1)] = 0.5;
+        measurement_noise[(2, 2)] = 0.5;
 
         EKF {
             state: {
@@ -204,21 +204,21 @@ impl EKF {
 
         let mut f = Matrix7::identity();
 
-        f[(0, 1)] = -p * dt;
-        f[(0, 2)] = -q * dt;
-        f[(0, 3)] = -r * dt;
+        f[(0, 1)] = -0.5 * p * dt;
+        f[(0, 2)] = -0.5 * q * dt;
+        f[(0, 3)] = -0.5 * r * dt;
 
-        f[(1, 0)] =  p * dt;
-        f[(1, 2)] =  r * dt;
-        f[(1, 3)] = -q * dt;
+        f[(1, 0)] =  0.5 * p * dt;
+        f[(1, 2)] =  0.5 * r * dt;
+        f[(1, 3)] = -0.5 * q * dt;
 
-        f[(2, 0)] =  q * dt;
-        f[(2, 1)] = -r * dt;
-        f[(2, 3)] =  p * dt;
+        f[(2, 0)] =  0.5 * q * dt;
+        f[(2, 1)] = -0.5 * r * dt;
+        f[(2, 3)] =  0.5 * p * dt;
 
-        f[(3, 0)] =  r * dt;
-        f[(3, 1)] =  q * dt;
-        f[(3, 2)] = -p * dt;
+        f[(3, 0)] =  0.5 * r * dt;
+        f[(3, 1)] =  0.5 * q * dt;
+        f[(3, 2)] = -0.5 * p * dt;
 
         f[(0, 4)] =  0.5 * q1 * dt;
         f[(0, 5)] =  0.5 * q2 * dt;
