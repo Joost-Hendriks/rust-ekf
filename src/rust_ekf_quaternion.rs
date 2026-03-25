@@ -27,7 +27,7 @@ impl EKF {
             let norm = Vector3::new(accel_data[0], accel_data[1], accel_data[2]).norm();
             let ax = accel_data[0] / norm;
             let ay = accel_data[1] / norm;
-            let az = -accel_data[2] / norm;
+            let az = accel_data[2] / norm;
 
             let q0 = (1.0 + az).sqrt() / 2.0;
             let q1 = -ay / (2.0 * q0);
@@ -41,18 +41,18 @@ impl EKF {
         };
 
         let mut process_noise = Matrix7::zeros();
-        process_noise[(0, 0)] = 0.0005;
-        process_noise[(1, 1)] = 0.0005;
-        process_noise[(2, 2)] = 0.0005;
-        process_noise[(3, 3)] = 0.0005;
-        process_noise[(4, 4)] = 0.0;
-        process_noise[(5, 5)] = 0.0;
-        process_noise[(6, 6)] = 0.0;
+        process_noise[(0, 0)] = 0.0001;
+        process_noise[(1, 1)] = 0.0001;
+        process_noise[(2, 2)] = 0.0001;
+        process_noise[(3, 3)] = 0.0001;
+        process_noise[(4, 4)] = 0.0001;
+        process_noise[(5, 5)] = 0.0001;
+        process_noise[(6, 6)] = 0.0001;
 
         let mut measurement_noise = Matrix3::zeros();
-        measurement_noise[(0, 0)] = 0.5;
-        measurement_noise[(1, 1)] = 0.5;
-        measurement_noise[(2, 2)] = 0.5;
+        measurement_noise[(0, 0)] = 0.001;
+        measurement_noise[(1, 1)] = 0.001;
+        measurement_noise[(2, 2)] = 0.001;
 
         EKF {
             state: {
@@ -150,9 +150,9 @@ impl EKF {
         //    h(x) = R^T * [0, 0, -g], expanded inline from the third row of R
         let (q0, q1, q2, q3) = (self.state[0], self.state[1], self.state[2], self.state[3]);
         let accel_expected = Vector3::new(
-            2.0 * GRAVITY * (q0 * q2 - q1 * q3),
-            -2.0 * GRAVITY * (q2 * q3 + q0 * q1),
-            GRAVITY * (2.0 * (q1 * q1 + q2 * q2) - 1.0),
+            2.0 * GRAVITY * (q1 * q3 - q0 * q2),
+            2.0 * GRAVITY * (q2 * q3 + q0 * q1),
+            GRAVITY * (1.0 - 2.0 * (q1 * q1 + q2 * q2)),
         );
 
         // 2. Innovation
@@ -245,18 +245,18 @@ impl EKF {
         let (q0, q1, q2, q3) = (q[0], q[1], q[2], q[3]);
 
         let mut h = Matrix3x4::zeros();
-        h[(0, 0)] =  2.0 * GRAVITY * q2;
-        h[(0, 1)] = -2.0 * GRAVITY * q3;
-        h[(0, 2)] =  2.0 * GRAVITY * q0;
-        h[(0, 3)] = -2.0 * GRAVITY * q1;
+        h[(0, 0)] = -2.0 * GRAVITY * q2;
+        h[(0, 1)] =  2.0 * GRAVITY * q3;
+        h[(0, 2)] = -2.0 * GRAVITY * q0;
+        h[(0, 3)] =  2.0 * GRAVITY * q1;
 
-        h[(1, 0)] = -2.0 * GRAVITY * q1;
-        h[(1, 1)] = -2.0 * GRAVITY * q0;
-        h[(1, 2)] = -2.0 * GRAVITY * q3;
-        h[(1, 3)] = -2.0 * GRAVITY * q2;
+        h[(1, 0)] =  2.0 * GRAVITY * q1;
+        h[(1, 1)] =  2.0 * GRAVITY * q0;
+        h[(1, 2)] =  2.0 * GRAVITY * q3;
+        h[(1, 3)] =  2.0 * GRAVITY * q2;
 
-        h[(2, 1)] = 4.0 * GRAVITY * q1;
-        h[(2, 2)] = 4.0 * GRAVITY * q2;
+        h[(2, 1)] = -4.0 * GRAVITY * q1;
+        h[(2, 2)] = -4.0 * GRAVITY * q2;
 
         h
     }
